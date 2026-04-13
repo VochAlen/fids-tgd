@@ -73,6 +73,9 @@ function airlineCodeFromFlight(iata: string | null): string {
 // ----------------------------------------------------------
 // 3.  MAPPER: TGDRawFlight → Flight
 // ----------------------------------------------------------
+// ----------------------------------------------------------
+// 3.  MAPPER: TGDRawFlight → Flight
+// ----------------------------------------------------------
 export function mapTGDFlight(raw: TGDRawFlight): Flight {
   const isDeparture  = raw.FlightType === 'Departure';
   const flightNumber = raw.FlightNumberIATA ?? raw.FlightNumberICAO ?? 'UNKNOWN';
@@ -88,21 +91,27 @@ export function mapTGDFlight(raw: TGDRawFlight): Flight {
   // IATA kôd odredišta: lookup tablica po nazivu aerodroma/grada
   const destinationIATA = getAirportIATA(raw.Airport);
 
-  const scheduledTime = raw.ScheduledDateTime ?? '';
-  const estimatedTime = raw.EstimatedDateTime  ?? '';
-  const actualTime    = raw.ActualDateTime     ?? '';
+  // -----------------------------------------------------------
+  // --- PROMENA: Formatiranje vremena koristeći postojeću funkciju ---
+  // -----------------------------------------------------------
+  
   const statusEN      = mapStatusEN(raw.StatusID);
 
-// Sigurnija varijanta (proverava da li niz uopšte postoji pre nego što proveri dužinu)
-const gate    = (raw.Gates && raw.Gates.length > 0) ? raw.Gates[0] : '';
-const checkin = (raw.Checkins && raw.Checkins.length > 0) ? raw.Checkins.join(',') : '';
-const baggage = (raw.BaggageBelts && raw.BaggageBelts.length > 0) ? raw.BaggageBelts[0] : '';
+  // Koristimo isoToHHMM za konverziju "2026-04-13T13:20:00..." u "13:20"
+  const scheduledTime = isoToHHMM(raw.ScheduledDateTime ?? '');
+  const estimatedTime = isoToHHMM(raw.EstimatedDateTime);
+  const actualTime    = isoToHHMM(raw.ActualDateTime);
+
+  // Sigurnija varijanta (proverava da li niz uopšte postoji pre nego što proveri dužinu)
+  const gate    = (raw.Gates && raw.Gates.length > 0) ? raw.Gates[0] : '';
+  const checkin = (raw.Checkins && raw.Checkins.length > 0) ? raw.Checkins.join(',') : '';
+  const baggage = (raw.BaggageBelts && raw.BaggageBelts.length > 0) ? raw.BaggageBelts[0] : '';
 
   return {
     id:             raw.ID,
     FlightNumber:   flightNumber,
     AirlineCode:    airlineCode,
-    AirlineICAO:    airlineICAO,       // ✅ popunjeno iz lookup tablice
+    AirlineICAO:    airlineICAO,
     AirlineName:    raw.Airline,
     AirlineLogoURL: airlineICAO
       ? `https://www.flightaware.com/images/airline_logos/180px/${airlineICAO}.png`
@@ -111,10 +120,11 @@ const baggage = (raw.BaggageBelts && raw.BaggageBelts.length > 0) ? raw.BaggageB
     FlightType: isDeparture ? 'departure' : 'arrival',
 
     DestinationAirportName: raw.Airport,
-    DestinationAirportCode: destinationIATA, // ✅ popunjeno iz lookup tablice
+    DestinationAirportCode: destinationIATA,
     DestinationCityName:    raw.Airport,
 
-    ScheduledDepartureTime: scheduledTime,
+    // Ova polja će sada sadržati "13:20" umesto celog ISO stringa
+    ScheduledDepartureTime: scheduledTime, 
     EstimatedDepartureTime: estimatedTime,
     ActualDepartureTime:    actualTime,
 
@@ -123,7 +133,7 @@ const baggage = (raw.BaggageBelts && raw.BaggageBelts.length > 0) ? raw.BaggageB
 
     Terminal:        'T1',
     GateNumber:      gate,
-    GateNumbers:     gate    ? [gate]                              : [],
+    GateNumbers:     gate ? [gate] : [],
     CheckInDesk:     checkin,
     CheckInDesks:    checkin ? checkin.split(',').map(d => d.trim()) : [],
     BaggageReclaim:  baggage,
@@ -140,7 +150,10 @@ const baggage = (raw.BaggageBelts && raw.BaggageBelts.length > 0) ? raw.BaggageB
     Airline:      raw.Airline,
     Destination:  isDeparture ? raw.Airport : '',
     Origin:       isDeparture ? '' : raw.Airport,
-    ScheduleTime: isoToHHMM(scheduledTime),
+    
+    // Ovo polje je već bilo formatirano, ostaje isto
+    ScheduleTime: isoToHHMM(raw.ScheduledDateTime ?? ''), 
+    
     Status:       statusEN,
     Gate:         gate,
   };
