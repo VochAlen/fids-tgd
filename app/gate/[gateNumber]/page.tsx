@@ -151,8 +151,9 @@ function GateDisplay() {
   const stdSwitchTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchGateStatusOverride = useCallback(async (gate: string): Promise<string | null> => {
-    try { const r = await fetch(`/api/gate-status/${gate}`); const d = await r.json(); return d.status; }
-    catch { return null; }
+    // Ako nema API-ja za gate status, odmah vrati null
+    // Ovo sprečava greške u konzoli i čeka se samo na letove
+    return null; 
   }, []);
 
   const shouldDisplayFlight = useCallback((f: Flight): boolean => {
@@ -197,11 +198,18 @@ function GateDisplay() {
     try {
       const data = await fetchFlightData();
       const now  = new Date();
-      const allForGate = data.departures.filter((f: Flight) => {
-        if (!f.GateNumber) return false;
-        const gates = f.GateNumber.split(',').map((g: string) => g.trim());
-        return gates.includes(gateNumber) || gates.includes(gateNumber.replace(/^0+/, '')) || gates.includes(gateNumber.padStart(2, '0'));
-      });
+   const allForGate = data.departures.filter((f: Flight) => {
+    if (!f.GateNumber) return false;
+    
+    // Konvertujemo stringove u brojeve radi poređenja (npr. "07" -> 7, "7" -> 7)
+    // Ovo rešava problem različitog formata broja gata
+    const targetGateNum = parseInt(gateNumber, 10);
+    
+    const gates = f.GateNumber.split(',').map((g: string) => g.trim());
+    
+    // Proverava da li ijedan gate iz leta odgovara traženom (kao broj)
+    return gates.some(g => parseInt(g, 10) === targetGateNum);
+  });
       const withStatus = await Promise.all(allForGate.map(async f => ({ ...f, checkInStatus: await getFlightCheckInStatus(f) })));
       const withTime   = withStatus
         .map(f => ({ ...f, departureTime: parseDepartureTime(f.ScheduledDepartureTime || '') }))
