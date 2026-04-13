@@ -149,6 +149,8 @@ class FlightBoardErrorBoundary extends Component<
 // ============================================================
 // HELPER FUNKCIJE
 // ============================================================
+
+
 const getFlightawareLogoURL = (icaoCode: string): string =>
   icaoCode ? `https://www.flightaware.com/images/airline_logos/180px/${icaoCode}.png` : ""
 
@@ -290,6 +292,7 @@ const checkStatus = {
   isClose:       (f: Flight) => /^close$/i.test((f.StatusEN ?? "").trim()),
   isFinalCall:   (f: Flight) => /^final call$/i.test((f.StatusEN ?? "").trim()),
 }
+
 
 // ============================================================
 // AUTO-STATUS ZA DEPARTURES
@@ -574,6 +577,17 @@ const FlightRow = memo(
       }
     }, [icao])
 
+    // Izračunaj vreme ukrcavanja (30 min pre polaska)
+const getBoardingTime = (estTime: string) => {
+  if (!estTime) return null;
+  const d = parseFlightTimeToDate(estTime);
+  if (!d) return null;
+  d.setMinutes(d.getMinutes() - 30);
+  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+};
+
+const boardingTime = showArrivals ? null : getBoardingTime(flight.EstimatedDepartureTime || flight.ScheduledDepartureTime);
+
     const gateChangedAt  = (flight as any)._gateChangedAt
     const isGateChanged  = gateChangedAt && (Date.now() - gateChangedAt < 15_000)
 
@@ -602,11 +616,27 @@ const pillCls = `w-[95%] flex items-center justify-center gap-3 text-[1.9rem] fo
           style={{ minHeight: "68px", contain: "layout style" }}
         >
           {/* Scheduled */}
-          <div className="flex items-center justify-center" style={{ width: "180px" }}>
+          {/* <div className="flex items-center justify-center" style={{ width: "180px" }}>
             <div className="text-[2.5rem] font-black text-white drop-shadow-lg">
               {formatTimeString(flight.ScheduledDepartureTime) || <span className="text-white/40">--:--</span>}
             </div>
+            
+          </div> */}
+                    {/* Scheduled + Boarding Time zajedno */}
+          <div className="flex flex-col items-center justify-center gap-1" style={{ width: "180px" }}>
+            {/* Scheduled (Vreme) */}
+            <div className="text-[2.5rem] font-black text-white drop-shadow-lg leading-none">
+              {formatTimeString(flight.ScheduledDepartureTime) || <span className="text-white/40">--:--</span>}
+            </div>
+
+            {/* Boarding Time (Samo za Departures) */}
+            {!showArrivals && boardingTime && (
+              <div className="text-[0.75rem] font-bold text-green-400 uppercase tracking-wider" style={{ textShadow: "0 1px 2px rgba(0,0,0,0.8)" }}>
+                Boarding at {boardingTime}
+              </div>
+            )}
           </div>
+          
 
           {/* Estimated */}
           <div className="flex items-center justify-center" style={{ width: "180px" }}>
