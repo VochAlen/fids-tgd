@@ -1,8 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/admin/redis-monitor",
-      "schedule": "0 */6 * * *"
-    }
-  ]
-}
+
