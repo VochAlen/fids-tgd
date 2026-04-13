@@ -1,3 +1,4 @@
+
 'use client';
 
 import type React from "react"
@@ -444,12 +445,40 @@ const TableHeaders = memo(function TableHeaders({
 // ============================================================
 // STATUS PILL LOGIKA
 // ============================================================
+// ============================================================
+// STATUS PILL LOGIKA (IZMENJENO ZA ARRIVALS "EXPECTED")
+// ============================================================
 type LEDColor = "blue"|"green"|"orange"|"red"|"yellow"|"cyan"|"purple"|"lime"
 
 function computeStatusPill(flight: Flight, isArrival: boolean, fmtTime: (t: string) => string) {
-  const autoStatus     = isArrival ? getAutoArrivalStatus(flight, fmtTime) : getAutoStatus(flight)
-  const effectiveStatus = autoStatus !== null ? autoStatus : (flight.StatusEN ?? "")
+  // -----------------------------------------------------------
+  // DODATAK: Posebna obrada za "Expected" status kod ARRIVALS
+  // -----------------------------------------------------------
+  let effectiveStatus = (flight.StatusEN ?? "").trim();
+  
+  // Ako je Arrival i status je "Expected" (bez obzira na malo/veliko slovo)
+  if (isArrival && /^expected$/i.test(effectiveStatus)) {
+    // Proveri da li ima EstimatedTime
+    if (flight.EstimatedDepartureTime && isValidDisplayTime(flight.EstimatedDepartureTime)) {
+      // Formatiraj vreme (npr. "14:30")
+      const timeStr = fmtTime(flight.EstimatedDepartureTime);
+      // Postavi tekst na "Expected at HH:MM"
+      effectiveStatus = `Expected at ${timeStr}`;
+    } else {
+      // Ako nema vremena, ostavi samo "Expected"
+      effectiveStatus = "Expected";
+    }
+  } else {
+    // Ako nije "Expected", koristi standardnu auto logiku ili ostavi status kakav je
+    const autoStatus = isArrival ? getAutoArrivalStatus(flight, fmtTime) : getAutoStatus(flight);
+    if (autoStatus !== null) {
+      effectiveStatus = autoStatus;
+    }
+  }
 
+  // -----------------------------------------------------------
+  // BOJE I STILOVI (Logika boja ostaje ista, samo proširena za Expected)
+  // -----------------------------------------------------------
   const isCancelled   = /(cancelled|canceled|otkazan)/i.test(effectiveStatus)
   const isDelayed     = /(delay|kasni)/i.test(effectiveStatus)
   const isBoarding    = !isArrival && /(boarding|gate open)/i.test(effectiveStatus)
@@ -462,6 +491,7 @@ function computeStatusPill(flight: Flight, isArrival: boolean, fmtTime: (t: stri
   const isClose       = !isArrival && /^close$/i.test(effectiveStatus.trim())
   const isFinalCall   = !isArrival && /^final call$/i.test(effectiveStatus.trim())
   const isArrived     = isArrival  && /(arrived|landed|sletio|sletjelo|dolazak|stigao)/i.test(effectiveStatus)
+  const isExpected    = /^expected/i.test(effectiveStatus) // NOVO: Detekcija Expected
 
   let displayText = effectiveStatus
   if (isProcessing) displayText = "Check-In"
@@ -474,7 +504,7 @@ function computeStatusPill(flight: Flight, isArrival: boolean, fmtTime: (t: stri
 
   const shouldBlink = isArrived || isCancelled || isBoarding || isGoToGate || isClose || isFinalCall
   const showLEDs    = isCancelled || isDelayed  || isBoarding || isProcessing ||
-                      isCheckInOpen || isArrived || isDiverted || isGoToGate || isClose || isFinalCall || isEarly
+                      isCheckInOpen || isArrived || isDiverted || isGoToGate || isClose || isFinalCall || isEarly || isExpected // Dodato isExpected
 
   let bg = "bg-white/10", border = "border-white/30", text = "text-white"
   let led1: LEDColor = "blue", led2: LEDColor = "green", blinkClass = ""
@@ -490,6 +520,14 @@ function computeStatusPill(flight: Flight, isArrival: boolean, fmtTime: (t: stri
   else if (isDiverted)               { bg="bg-orange-500/20"; border="border-orange-500/50"; text="text-orange-100"; led1="orange"; led2="red"                                          }
   else if (isOnTime)                 { bg="bg-lime-500/20";   border="border-lime-500/50";   text="text-lime-100";   led1="lime";   led2="green"                                        }
   else if (isArrived)                { bg="bg-green-500/20";  border="border-green-500/50";  text="text-green-100";  led1="green";  led2="lime";   blinkClass="animate-pill-blink"      }
+  // NOVO: STILOVI ZA "EXPECTED"
+  else if (isExpected) {
+    bg="bg-green-500/20"; 
+    border="border-green-500/50"; 
+    text="text-green-100"; // Svetlo zelena (light-green-100)
+    led1="green"; 
+    led2="lime"; 
+  }
 
   return { bg, border, text, led1, led2, blinkClass, showLEDs, hasStatusText, displayText }
 }
@@ -558,7 +596,6 @@ const pillCls = `w-[95%] flex items-center justify-center gap-3 text-[1.9rem] fo
       <>
         {/* ════════════════════════════════════════
             DESKTOP LAYOUT (sm: 640px i više)
-            Identičan originalnom kodu — ništa nije promijenjeno
             ════════════════════════════════════════ */}
         <div
           className={`hidden sm:flex gap-2 p-1 border-b border-white/10 ${rowBg}`}
@@ -594,11 +631,14 @@ const pillCls = `w-[95%] flex items-center justify-center gap-3 text-[1.9rem] fo
 
           {showArrivals ? (
             <>
+              {/* ARRIVALS - ORIGINALNI LAYOUT */}
               <div className="flex items-center" style={{ width: "580px" }}>
                 <div className="text-[3.3rem] font-black text-white truncate drop-shadow-lg">
                   {flight.DestinationCityName || flight.DestinationAirportName}
                 </div>
               </div>
+              
+              {/* STATUS */}
               <div className="flex items-center justify-center" style={{ width: "650px" }}>
                 {pill.hasStatusText ? (
                   <div className={`${pillCls} overflow-hidden relative`}
@@ -621,17 +661,15 @@ const pillCls = `w-[95%] flex items-center justify-center gap-3 text-[1.9rem] fo
             </>
           ) : (
             <>
-              <div className="flex items-center" style={{ width: "380px" }}>
+              {/* DEPARTURES - IZMENJENI LAYOUT (BEZ CHECK-IN, PROŠIRENA DESTINACIJA) */}
+              <div className="flex items-center" style={{ width: "700px" }}>
                 <div className="text-[3.3rem] font-black text-white truncate drop-shadow-lg">
                   {flight.DestinationCityName || flight.DestinationAirportName}
                 </div>
               </div>
-              <div className="flex items-center justify-center" style={{ width: "320px" }}>
-                {flight.CheckInDesk && flight.CheckInDesk !== "-"
-                  ? <div className="text-[2.5rem] font-black text-white bg-black/40 py-2 px-3 rounded-xl border-2 border-white/20 shadow-xl">{flight.CheckInDesk}</div>
-                  : <div className="text-[2.5rem] font-black text-transparent py-2 px-3">-</div>}
-              </div>
-              <div className="flex items-center justify-center" style={{ width: "180px" }}>
+
+              {/* GATE */}
+              <div className="flex items-center justify-center" style={{ width: "220px" }}>
                 {flight.GateNumber && flight.GateNumber !== "-"
                   ? <div className={`text-[2.5rem] font-black py-2 px-3 rounded-xl border-2 shadow-xl
                       ${isGateChanged
@@ -641,21 +679,23 @@ const pillCls = `w-[95%] flex items-center justify-center gap-3 text-[1.9rem] fo
                     </div>
                   : <div className="text-[2.5rem] font-black text-transparent py-2 px-3">-</div>}
               </div>
-      <div className="flex items-center justify-center" style={{ width: "500px" }}>
-  {pill.hasStatusText ? (
-    <div className={`${pillCls} overflow-hidden text-[1.8rem]`}>
-      {pill.showLEDs && (
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <LEDIndicator color={pill.led1} phase="a" size="w-4 h-4" />
-          <LEDIndicator color={pill.led2} phase="b" size="w-4 h-4" />
-        </div>
-      )}
-      <span className="truncate whitespace-nowrap font-extrabold tracking-wide">{pill.displayText}</span>
-    </div>
-  ) : (
-    <div className="text-[1.6rem] font-bold text-slate-300">Scheduled</div>
-  )}
-</div>
+
+              {/* STATUS */}
+              <div className="flex items-center justify-center" style={{ width: "500px" }}>
+                {pill.hasStatusText ? (
+                  <div className={`${pillCls} overflow-hidden text-[1.8rem]`}>
+                    {pill.showLEDs && (
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <LEDIndicator color={pill.led1} phase="a" size="w-4 h-4" />
+                        <LEDIndicator color={pill.led2} phase="b" size="w-4 h-4" />
+                      </div>
+                    )}
+                    <span className="truncate whitespace-nowrap font-extrabold tracking-wide">{pill.displayText}</span>
+                  </div>
+                ) : (
+                  <div className="text-[1.6rem] font-bold text-slate-300">Scheduled</div>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -730,7 +770,7 @@ const pillCls = `w-[95%] flex items-center justify-center gap-3 text-[1.9rem] fo
               </span>
             )}
 
-            {/* Status pill — isti vizualni jezik kao desktop, samo manji */}
+            {/* Status pill — isti vizuelni jezik kao desktop, samo manji */}
             {pill.hasStatusText ? (
               <div className={mobilePillCls}>
                 {pill.showLEDs && (
@@ -1044,17 +1084,16 @@ const tableHeaders = useMemo(() => {
     { label: t.scheduled, width: "180px", icon: Clock       },
     { label: t.estimated, width: "180px", icon: Clock       },
     { label: t.flight,    width: "280px", icon: ArrivalIcon  },
-    { label: t.from,      width: "580px", icon: MapPin      },  // Smanjeno sa 580px na 480px
-    { label: t.status,    width: "720px", icon: Info        },  // Povećano sa 620px na 720px
+    { label: t.from,      width: "580px", icon: MapPin      },  // ORIGINALNO
+    { label: t.status,    width: "650px", icon: Info        },  // ORIGINALNO
   ]
   return [
     { label: t.scheduled,   width: "180px", icon: Clock        },
     { label: t.estimated,   width: "180px", icon: Clock        },
     { label: t.flight,      width: "280px", icon: DepartureIcon },
-    { label: t.destination, width: "380px", icon: MapPin       },
-    { label: t.checkIn,     width: "340px", icon: Users        },  // Povećano sa 320px na 340px (približeno Gate koloni)
-    { label: t.gate,        width: "220px", icon: DoorOpen     },  // Povećano sa 180px na 220px
-    { label: t.status,      width: "500px", icon: Info         },  // Povećano sa 420px na 500px
+    { label: t.destination, width: "700px", icon: MapPin       },  // PROŠIRENO
+    { label: t.gate,        width: "220px", icon: DoorOpen     },
+    { label: t.status,      width: "500px", icon: Info         },
   ]
 }, [showArrivals, lang, ArrivalIcon, DepartureIcon])
 
