@@ -422,17 +422,24 @@ If you see two stairs on the aircraft: passengers in the rear half of the plane 
         {/* ── RIGHT COLUMN ── */}
         <div style={styles.rightCol}>
 
-          {/* Scheduled departure */}
+  {/* Scheduled departure */}
           <div style={styles.timeBlock}>
             <div style={styles.timeLabel}>SCHEDULED DEPARTURE</div>
-            <div style={styles.timeValue}>{f.ScheduledDepartureTime}</div>
+            {/* PROMENA: Koristi ScheduleTime (HH:MM) umesto ScheduledDepartureTime */}
+            <div style={styles.timeValue}>{f.ScheduleTime}</div> 
           </div>
 
           {/* Estimated departure */}
+      {/* Estimated departure */}
           {hasDel && (
             <div style={{ ...styles.timeBlock, marginTop: '1rem' }}>
               <div style={{ ...styles.timeLabel, color: '#f59e0b' }}>ESTIMATED DEPARTURE</div>
-              <div style={{ ...styles.timeValue, color: '#f59e0b' }}>{f.EstimatedDepartureTime}</div>
+              
+              {/* ZA ESTIMATED: Moramo formatirati "u letu" jer nemamo posebno polje u adapteru */}
+              {/* Dodaj ovu pomoćnu liniju iznad rendera ili koristi male promene: */}
+              <div style={{ ...styles.timeValue, color: '#f59e0b' }}>
+                 {f.EstimatedDepartureTime ? new Date(f.EstimatedDepartureTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''}
+              </div>
             </div>
           )}
 
@@ -504,7 +511,14 @@ If you see two stairs on the aircraft: passengers in the rear half of the plane 
             <span style={styles.nextLabel}>NEXT FLIGHT</span>
             <span style={styles.nextFN}>{display.nextFlight.FlightNumber}</span>
             <span style={styles.nextDest}>{display.nextFlight.DestinationAirportCode} — {display.nextFlight.DestinationCityName}</span>
-            <span style={styles.nextTime}>{display.nextFlight.ScheduledDepartureTime}</span>
+            
+            {/* --- PROMENA: Formatiranje vremena za Next Flight --- */}
+            <span style={styles.nextTime}>
+              {display.nextFlight.ScheduledDepartureTime 
+                ? new Date(display.nextFlight.ScheduledDepartureTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) 
+                : ''}
+            </span>
+            
           </div>
         )}
       </div>

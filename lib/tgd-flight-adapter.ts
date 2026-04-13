@@ -73,7 +73,6 @@ function airlineCodeFromFlight(iata: string | null): string {
 // ----------------------------------------------------------
 // 3.  MAPPER: TGDRawFlight → Flight
 // ----------------------------------------------------------
-// ----------------------------------------------------------
 // 3.  MAPPER: TGDRawFlight → Flight
 // ----------------------------------------------------------
 export function mapTGDFlight(raw: TGDRawFlight): Flight {
@@ -92,17 +91,20 @@ export function mapTGDFlight(raw: TGDRawFlight): Flight {
   const destinationIATA = getAirportIATA(raw.Airport);
 
   // -----------------------------------------------------------
-  // --- PROMENA: Formatiranje vremena koristeći postojeću funkciju ---
+  // VREMENA: Koristimo PUNI DATUM za logiku i FORMATIRANO za prikaz
   // -----------------------------------------------------------
   
   const statusEN      = mapStatusEN(raw.StatusID);
 
-  // Koristimo isoToHHMM za konverziju "2026-04-13T13:20:00..." u "13:20"
-  const scheduledTime = isoToHHMM(raw.ScheduledDateTime ?? '');
-  const estimatedTime = isoToHHMM(raw.EstimatedDateTime);
-  const actualTime    = isoToHHMM(raw.ActualDateTime);
+  // OVO JE BITNO: Puni datum (ISO 8601) potreban je za sortiranje i računanje vremena
+  const scheduledTime = raw.ScheduledDateTime ?? '';
+  const estimatedTime = raw.EstimatedDateTime  ?? '';
+  const actualTime    = raw.ActualDateTime     ?? '';
 
-  // Sigurnija varijanta (proverava da li niz uopšte postoji pre nego što proveri dužinu)
+  // OVO JE BITNO: Formatirano vreme (HH:MM) za lako prikazivanje na FIDS-u
+  const scheduleTimeDisplay = isoToHHMM(raw.ScheduledDateTime ?? '');
+
+  // Sigurnija varijanta za obradu nizova
   const gate    = (raw.Gates && raw.Gates.length > 0) ? raw.Gates[0] : '';
   const checkin = (raw.Checkins && raw.Checkins.length > 0) ? raw.Checkins.join(',') : '';
   const baggage = (raw.BaggageBelts && raw.BaggageBelts.length > 0) ? raw.BaggageBelts[0] : '';
@@ -111,7 +113,7 @@ export function mapTGDFlight(raw: TGDRawFlight): Flight {
     id:             raw.ID,
     FlightNumber:   flightNumber,
     AirlineCode:    airlineCode,
-    AirlineICAO:    airlineICAO,
+    AirlineICAO:    airlineICAO,       // ✅ popunjeno iz lookup tablice
     AirlineName:    raw.Airline,
     AirlineLogoURL: airlineICAO
       ? `https://www.flightaware.com/images/airline_logos/180px/${airlineICAO}.png`
@@ -120,10 +122,10 @@ export function mapTGDFlight(raw: TGDRawFlight): Flight {
     FlightType: isDeparture ? 'departure' : 'arrival',
 
     DestinationAirportName: raw.Airport,
-    DestinationAirportCode: destinationIATA,
+    DestinationAirportCode: destinationIATA, // ✅ popunjeno iz lookup tablice
     DestinationCityName:    raw.Airport,
 
-    // Ova polja će sada sadržati "13:20" umesto celog ISO stringa
+    // Ova tri polja moraju biti ISO stringovi za rad aplikacije
     ScheduledDepartureTime: scheduledTime, 
     EstimatedDepartureTime: estimatedTime,
     ActualDepartureTime:    actualTime,
@@ -133,7 +135,7 @@ export function mapTGDFlight(raw: TGDRawFlight): Flight {
 
     Terminal:        'T1',
     GateNumber:      gate,
-    GateNumbers:     gate ? [gate] : [],
+    GateNumbers:     gate    ? [gate]                              : [],
     CheckInDesk:     checkin,
     CheckInDesks:    checkin ? checkin.split(',').map(d => d.trim()) : [],
     BaggageReclaim:  baggage,
@@ -151,14 +153,13 @@ export function mapTGDFlight(raw: TGDRawFlight): Flight {
     Destination:  isDeparture ? raw.Airport : '',
     Origin:       isDeparture ? '' : raw.Airport,
     
-    // Ovo polje je već bilo formatirano, ostaje isto
-    ScheduleTime: isoToHHMM(raw.ScheduledDateTime ?? ''), 
+    // Ovo polje koristiš za prikaz "SCHEDULED DEPARTURE" vremena na ekranu
+    ScheduleTime: scheduleTimeDisplay, 
     
     Status:       statusEN,
     Gate:         gate,
   };
 }
-
 // ----------------------------------------------------------
 // 4.  FILTER, SORT, DEDUP, PARSE, PIPELINE
 // ----------------------------------------------------------
