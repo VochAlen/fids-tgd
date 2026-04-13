@@ -93,9 +93,10 @@ export function mapTGDFlight(raw: TGDRawFlight): Flight {
   const actualTime    = raw.ActualDateTime     ?? '';
   const statusEN      = mapStatusEN(raw.StatusID);
 
-  const gate    = raw.Gates.length      > 0 ? raw.Gates[0]           : '';
-  const checkin = raw.Checkins.length   > 0 ? raw.Checkins.join(',') : '';
-  const baggage = raw.BaggageBelts.length > 0 ? raw.BaggageBelts[0] : '';
+// Sigurnija varijanta (proverava da li niz uopšte postoji pre nego što proveri dužinu)
+const gate    = (raw.Gates && raw.Gates.length > 0) ? raw.Gates[0] : '';
+const checkin = (raw.Checkins && raw.Checkins.length > 0) ? raw.Checkins.join(',') : '';
+const baggage = (raw.BaggageBelts && raw.BaggageBelts.length > 0) ? raw.BaggageBelts[0] : '';
 
   return {
     id:             raw.ID,
