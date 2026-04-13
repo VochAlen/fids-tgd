@@ -14,7 +14,7 @@ import {
 // Svi kiosci dijele isti server-side cache (45s svježina),
 // umjesto da svaki poziva vanjski API direktno.
 // ─────────────────────────────────────────────────────────────
-const FLIGHT_API_URL = '/api/flights-cached';
+const FLIGHT_API_URL = '/api/flights';
 
 const MIN_FETCH_INTERVAL = 30_000; // 30s — dodatna klijentska zaštita
 let lastFetchTime = 0;
