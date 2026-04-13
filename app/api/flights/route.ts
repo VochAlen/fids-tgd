@@ -1,11 +1,11 @@
-// app/api/flights/route.ts  —  TGD (Podgorica) verzija
+// app/api/flights/route.ts  —  TGD (Podgorica) verzija (BEZ REDISA)
 import { NextResponse } from 'next/server';
-import { getRedisClient } from '@/lib/redis';
+// Uklonjen Redis import
+// import { getRedisClient } from '@/lib/redis'; 
 import { FlightBackupService } from '@/lib/backup/flight-backup-service';
 import { FlightAutoProcessor, type AutoProcessedFlight } from '@/lib/backup/flight-auto-processor';
 import type { Flight, FlightData } from '@/types/flight';
 import { processTGDFlights } from '@/lib/tgd-flight-adapter';
-import Redis from 'ioredis';
 
 // ── TGD (Podgorica) API endpoint ───────────────────────────────────────────────
 const FLIGHT_API_URL =
@@ -20,75 +20,6 @@ const userAgents = {
   firefox: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:117.0) Gecko/20100101 Firefox/117.0',
   safari:  'Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
 };
-
-// ==============================================================================
-// POMOĆNA FUNKCIJA: Admin override-i iz Redis-a
-// Koristi SCAN umjesto KEYS kako ne bi zamrzao RAM na free planu
-// ==============================================================================
-async function applyKvOverrides(flights: Flight[]): Promise<Flight[]> {
-  let client: Redis;
-  try {
-    client = getRedisClient();
-
-    const keys: string[] = [];
-    let cursor = '0';
-    do {
-      const scanResult = await client.scan(cursor, 'MATCH', 'override:*', 'COUNT', 100);
-      cursor = scanResult[0];
-      keys.push(...scanResult[1]);
-      if (keys.length > 200) break;
-    } while (cursor !== '0');
-
-    if (keys.length === 0) return flights;
-
-    const pipeline = client.pipeline();
-    keys.forEach(key => pipeline.hgetall(key));
-    const results = await pipeline.exec();
-
-    if (!results || results.length === 0) return flights;
-
-    const overridesMap: Record<string, Record<string, string>> = {};
-    keys.forEach((key, index) => {
-      const result = results[index];
-      if (result && !result[0] && result[1]) {
-        const flightNumber = key.replace('override:', '');
-        const parsedData   = result[1] as Record<string, string>;
-        if (Object.keys(parsedData).length > 0) {
-          overridesMap[flightNumber] = parsedData;
-        }
-      }
-    });
-
-    // __EMPTY__ → '' (slobodan šalter/gate)
-    // undefined → nema overridea, vrati API vrijednost
-    const resolveField = (
-      overrideVal: string | undefined,
-      apiVal: string | undefined
-    ): string => {
-      if (overrideVal === undefined) return apiVal ?? '';
-      if (overrideVal === '__EMPTY__') return '';
-      return overrideVal;
-    };
-
-    return flights.map(flight => {
-      const localOverride = overridesMap[flight.FlightNumber];
-      if (!localOverride) return flight;
-
-      return {
-        ...flight,
-        GateNumber:     resolveField(localOverride.GateNumber,     flight.GateNumber),
-        CheckInDesk:    resolveField(localOverride.CheckInDesk,    flight.CheckInDesk),
-        BaggageReclaim: resolveField(localOverride.BaggageReclaim, flight.BaggageReclaim),
-        StatusEN:       resolveField(localOverride.StatusEN,       flight.StatusEN),
-        Terminal:       resolveField(localOverride.Terminal,       flight.Terminal),
-      };
-    });
-
-  } catch (error) {
-    console.error('⚠️ Redis Override read failed (FIDS continues normally):', error);
-    return flights;
-  }
-}
 
 // ==============================================================================
 // FETCH SA RETRY
@@ -205,14 +136,8 @@ export async function GET(): Promise<NextResponse> {
       console.error('⚠️ Backup save failed:', backupError instanceof Error ? backupError.message : backupError);
     }
 
-    // ── Admin overrides iz Redis-a ────────────────────────────────────────────
-    let [departures, arrivals] = await Promise.all([
-      applyKvOverrides(mappedDep),
-      applyKvOverrides(mappedArr),
-    ]);
-
-    // ── Default traka za dolaske koji još nisu sletili ────────────────────────
-    arrivals = arrivals.map((flight: Flight) => {
+    // ── Default traka za dolaske (Direct processing, bez Redis-a) ─────────────
+    const arrivals = mappedArr.map((flight: Flight) => {
       const statusLower = (flight.StatusEN || '').toLowerCase();
       const isArrived   = statusLower.includes('arrived') ||
                           statusLower.includes('sletio')  ||
@@ -222,6 +147,8 @@ export async function GET(): Promise<NextResponse> {
       }
       return flight;
     });
+
+    const departures = mappedDep; // Nema izmjena za odlaske
 
     const totalFlights = departures.length + arrivals.length;
 
@@ -272,12 +199,7 @@ export async function GET(): Promise<NextResponse> {
           simulatedFlights.filter((f: AutoProcessedFlight) => f.FlightType === 'arrival')
         );
 
-        [autoProcessedDepartures, autoProcessedArrivals] = await Promise.all([
-          applyKvOverrides(autoProcessedDepartures),
-          applyKvOverrides(autoProcessedArrivals),
-        ]);
-
-        // Default traka za backup mode
+        // ── Default traka za backup mode (bez Redis-a) ────────────────────────
         autoProcessedArrivals = autoProcessedArrivals.map((flight: Flight) => {
           const statusLower = (flight.StatusEN || '').toLowerCase();
           const isArrived   = statusLower.includes('arrived') ||
@@ -341,10 +263,17 @@ export async function GET(): Promise<NextResponse> {
             processedFlights.filter((f: AutoProcessedFlight) => f.FlightType === 'arrival')
           );
 
-          [departures, arrivals] = await Promise.all([
-            applyKvOverrides(departures),
-            applyKvOverrides(arrivals),
-          ]);
+          // Default traka za emergency mode (bez Redis-a)
+          arrivals = arrivals.map((flight: Flight) => {
+            const statusLower = (flight.StatusEN || '').toLowerCase();
+            const isArrived   = statusLower.includes('arrived') ||
+                                statusLower.includes('sletio')  ||
+                                statusLower.includes('landed');
+            if (!isArrived && !flight.BaggageReclaim) {
+              return { ...flight, BaggageReclaim: '2' };
+            }
+            return flight;
+          });
 
           const totalFlights = departures.length + arrivals.length;
 
