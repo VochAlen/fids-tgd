@@ -61,7 +61,7 @@ const AirlineLogo = memo(function AirlineLogo(
     if (el) el.innerHTML = `<span style="color:#6b7280;font-size:14px;font-family:var(--font-mono);letter-spacing:.15em;font-weight:600">${name || code}</span>`;
   }, [code, name]);
   return (
-    <div style={styles.logoCard}>
+    <div style={styles.logoCard} className="fids-logo-card">
       {code
         ? <img src={src} alt={name} style={styles.logoImg} onError={handleError} />
         : <span style={styles.logoFallback}>{name || '—'}</span>
@@ -124,10 +124,10 @@ function LiveClock() {
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, []);
-  return <span style={styles.clock}>{time}</span>;
+  return <span style={styles.clock} className="fids-clock">{time}</span>;
 }
 
-function Divider() { return <div style={styles.divider} />; }
+function Divider() { return <div style={styles.divider} className="fids-divider" />; }
 
 export default function GatePage() {
   return <GateErrorBoundary><GateDisplay /></GateErrorBoundary>;
@@ -151,8 +151,6 @@ function GateDisplay() {
   const stdSwitchTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchGateStatusOverride = useCallback(async (gate: string): Promise<string | null> => {
-    // Ako nema API-ja za gate status, odmah vrati null
-    // Ovo sprečava greške u konzoli i čeka se samo na letove
     return null; 
   }, []);
 
@@ -198,18 +196,12 @@ function GateDisplay() {
     try {
       const data = await fetchFlightData();
       const now  = new Date();
-   const allForGate = data.departures.filter((f: Flight) => {
-    if (!f.GateNumber) return false;
-    
-    // Konvertujemo stringove u brojeve radi poređenja (npr. "07" -> 7, "7" -> 7)
-    // Ovo rešava problem različitog formata broja gata
-    const targetGateNum = parseInt(gateNumber, 10);
-    
-    const gates = f.GateNumber.split(',').map((g: string) => g.trim());
-    
-    // Proverava da li ijedan gate iz leta odgovara traženom (kao broj)
-    return gates.some(g => parseInt(g, 10) === targetGateNum);
-  });
+      const allForGate = data.departures.filter((f: Flight) => {
+        if (!f.GateNumber) return false;
+        const targetGateNum = parseInt(gateNumber, 10);
+        const gates = f.GateNumber.split(',').map((g: string) => g.trim());
+        return gates.some(g => parseInt(g, 10) === targetGateNum);
+      });
       const withStatus = await Promise.all(allForGate.map(async f => ({ ...f, checkInStatus: await getFlightCheckInStatus(f) })));
       const withTime   = withStatus
         .map(f => ({ ...f, departureTime: parseDepartureTime(f.ScheduledDepartureTime || '') }))
@@ -343,7 +335,7 @@ function GateDisplay() {
   if (!display.flight) {
     const closed = display.manualGateStatus === 'closed';
     return (
-      <div style={styles.splash}>
+      <div style={styles.splash} className="fids-splash">
         <div style={{ ...styles.gateLabel, fontSize: 'clamp(5rem,18vw,14rem)', lineHeight: 1 }}>{gateNumber}</div>
         <div style={{ fontSize: '2rem', fontWeight: 600, letterSpacing: '.08em', color: closed ? '#ef4444' : '#475569', marginTop: '1rem' }}>
           {closed ? 'GATE CLOSED' : 'NO FLIGHTS SCHEDULED'}
@@ -358,11 +350,11 @@ function GateDisplay() {
   // ── RENDER: Main ─────────────────────────────────────────────
   const f = display.flight;
   return (
-    <div style={styles.root}>
+    <div style={styles.root} className="fids-root">
 
       {/* TOP BAR */}
-      <div style={styles.topBar}>
-        <div style={styles.topBarLeft}>
+      <div style={styles.topBar} className="fids-topbar">
+        <div style={styles.topBarLeft} className="fids-topbar-left">
           <span style={styles.topBarLabel}>GATE</span>
           <span style={styles.topBarGate}>{gateNumber}</span>
           {f.Terminal && (
@@ -379,17 +371,17 @@ function GateDisplay() {
       <Divider />
 
       {/* MAIN CONTENT */}
-      <div style={styles.main}>
+      <div style={styles.main} className="fids-main">
 
         {/* ── LEFT COLUMN ── */}
-        <div style={styles.leftCol}>
+        <div style={styles.leftCol} className="fids-left-col">
 
           <AirlineLogo icao={f.AirlineICAO} flightNumber={f.FlightNumber} name={f.AirlineName} />
 
-          <div style={styles.flightNumber}>{f.FlightNumber}</div>
+          <div style={styles.flightNumber} className="fids-flight-number">{f.FlightNumber}</div>
 
           {f.CodeShareFlights?.length > 0 && (
-            <div style={styles.codeshare}>
+            <div style={styles.codeshare} className="fids-codeshare">
               Also operating as:&nbsp;
               <span style={styles.codeshareList}>{f.CodeShareFlights.join(' · ')}</span>
             </div>
@@ -397,55 +389,51 @@ function GateDisplay() {
 
           <Divider />
 
-          <div style={styles.destCode}>{f.DestinationAirportCode}</div>
-          <div style={styles.destCity}>{f.DestinationCityName}</div>
+          <div style={styles.destCode} className="fids-dest-code">{f.DestinationAirportCode}</div>
+          <div style={styles.destCity} className="fids-dest-city">{f.DestinationCityName}</div>
 
           {/* ── PORTABLE CHARGERS WARNING ── */}
-          <div style={styles.chargerWarning}>
+          <div style={styles.chargerWarning} className="fids-charger-warning">
             <span style={styles.chargerIcon}>⚠</span>
             <span style={styles.chargerText}>
               Portable chargers: CABIN BAGGAGE ONLY! Not in overhead bins. No charging during flight.
             </span>
           </div>
           {/* ── BOARDING NOTICE ── */}
-<div style={styles.boardingNotice}>
-  <span style={styles.boardingIcon}>✈️</span>
-  <span style={styles.boardingText}>
-If you see two stairs on the aircraft: passengers in the rear half of the plane board via the rear stairs, others via the front. Thank you!  </span>
-</div>
+          <div style={styles.boardingNotice} className="fids-boarding-notice">
+            <span style={styles.boardingIcon}>✈️</span>
+            <span style={styles.boardingText}>
+              If you see two stairs on the aircraft: passengers in the rear half of the plane board via the rear stairs, others via the front. Thank you!
+            </span>
+          </div>
 
         </div>
 
         {/* VERTICAL DIVIDER */}
-        <div style={styles.vDivider} />
+        <div style={styles.vDivider} className="fids-v-divider" />
 
         {/* ── RIGHT COLUMN ── */}
-        <div style={styles.rightCol}>
+        <div style={styles.rightCol} className="fids-right-col">
 
-  {/* Scheduled departure */}
+          {/* Scheduled departure */}
           <div style={styles.timeBlock}>
             <div style={styles.timeLabel}>SCHEDULED DEPARTURE</div>
-            {/* PROMENA: Koristi ScheduleTime (HH:MM) umesto ScheduledDepartureTime */}
-            <div style={styles.timeValue}>{f.ScheduleTime}</div> 
+            <div style={styles.timeValue} className="fids-time-value">{f.ScheduleTime}</div>
           </div>
 
           {/* Estimated departure */}
-      {/* Estimated departure */}
           {hasDel && (
             <div style={{ ...styles.timeBlock, marginTop: '1rem' }}>
               <div style={{ ...styles.timeLabel, color: '#f59e0b' }}>ESTIMATED DEPARTURE</div>
-              
-              {/* ZA ESTIMATED: Moramo formatirati "u letu" jer nemamo posebno polje u adapteru */}
-              {/* Dodaj ovu pomoćnu liniju iznad rendera ili koristi male promene: */}
-              <div style={{ ...styles.timeValue, color: '#f59e0b' }}>
-                 {f.EstimatedDepartureTime ? new Date(f.EstimatedDepartureTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''}
+              <div style={{ ...styles.timeValue, color: '#f59e0b' }} className="fids-time-value">
+                {f.EstimatedDepartureTime ? new Date(f.EstimatedDepartureTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''}
               </div>
             </div>
           )}
 
           {/* Countdown */}
           {!isCancelled && !isDiverted && timeUntilDeparture !== null && timeUntilDeparture > 0 && (
-            <div style={styles.countdown}>
+            <div style={styles.countdown} className="fids-countdown">
               <span style={styles.countdownVal}>{formatTimeRemaining(timeUntilDeparture)}</span>
               <span style={styles.countdownLabel}>until departure</span>
             </div>
@@ -454,11 +442,11 @@ If you see two stairs on the aircraft: passengers in the rear half of the plane 
           <Divider />
 
           {/* Status badge */}
-          <div style={styles.statusBlock}>
+          <div style={styles.statusBlock} className="fids-status-block">
             {isCancelled ? (
-              <div style={{ ...styles.statusBadge, background: '#7f1d1d', color: '#fca5a5' }}>CANCELLED</div>
+              <div style={{ ...styles.statusBadge, background: '#7f1d1d', color: '#fca5a5' }} className="fids-status-badge">CANCELLED</div>
             ) : isDiverted ? (
-              <div style={{ ...styles.statusBadge, background: '#7c2d12', color: '#fdba74' }}>DIVERTED</div>
+              <div style={{ ...styles.statusBadge, background: '#7c2d12', color: '#fdba74' }} className="fids-status-badge">DIVERTED</div>
             ) : (
               <div style={{
                 ...styles.statusBadge,
@@ -466,7 +454,7 @@ If you see two stairs on the aircraft: passengers in the rear half of the plane 
                 color: statusCfg.color,
                 border: `1.5px solid ${statusCfg.color}44`,
                 animation: statusCfg.pulse ? 'fidsPulse 1.2s ease-in-out infinite' : 'none',
-              }}>
+              }} className="fids-status-badge">
                 {effectiveStatus.toUpperCase()}
               </div>
             )}
@@ -474,18 +462,18 @@ If you see two stairs on the aircraft: passengers in the rear half of the plane 
 
           {/* Gate changed */}
           {isGateChanged && (
-            <div style={styles.gateChangedBanner}>⚠ GATE CHANGED TO {f.GateNumber}</div>
+            <div style={styles.gateChangedBanner} className="fids-gate-changed-banner">⚠ GATE CHANGED TO {f.GateNumber}</div>
           )}
 
           {/* Check-in closing */}
           {display.checkInStatus?.checkInCloseTime && timeUntilDeparture !== null && timeUntilDeparture <= 30 && timeUntilDeparture > 0 && (
-            <div style={styles.checkInBanner}>
+            <div style={styles.checkInBanner} className="fids-checkin-banner">
               FLIGHT CLOSES IN {formatTimeRemaining(Math.max(0, timeUntilDeparture - 5))}
             </div>
           )}
 
           {/* ── DANGEROUS GOODS IMAGE ── */}
-          <div style={styles.dangerousGoodsWrapper}>
+          <div style={styles.dangerousGoodsWrapper} className="fids-dgr-wrapper">
             <img
               src="/dgr-gate.png"
               alt="Dangerous Goods — Not Allowed"
@@ -500,25 +488,22 @@ If you see two stairs on the aircraft: passengers in the rear half of the plane 
       <Divider />
 
       {/* FOOTER */}
-      <div style={styles.footer}>
-        <div style={styles.footerMeta}>
+      <div style={styles.footer} className="fids-footer">
+        <div style={styles.footerMeta} className="fids-footer-meta">
           <span>LAST UPDATE&nbsp;&nbsp;{lastUpdate}</span>
           <span style={{ opacity: .35 }}>│</span>
           <span>NEXT UPDATE&nbsp;&nbsp;{nextUpdate}</span>
         </div>
         {display.nextFlight && (
-          <div style={styles.nextFlight}>
+          <div style={styles.nextFlight} className="fids-next-flight">
             <span style={styles.nextLabel}>NEXT FLIGHT</span>
-            <span style={styles.nextFN}>{display.nextFlight.FlightNumber}</span>
-            <span style={styles.nextDest}>{display.nextFlight.DestinationAirportCode} — {display.nextFlight.DestinationCityName}</span>
-            
-            {/* --- PROMENA: Formatiranje vremena za Next Flight --- */}
-            <span style={styles.nextTime}>
-              {display.nextFlight.ScheduledDepartureTime 
-                ? new Date(display.nextFlight.ScheduledDepartureTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) 
+            <span style={styles.nextFN} className="fids-next-fn">{display.nextFlight.FlightNumber}</span>
+            <span style={styles.nextDest} className="fids-next-dest">{display.nextFlight.DestinationAirportCode} — {display.nextFlight.DestinationCityName}</span>
+            <span style={styles.nextTime} className="fids-next-time">
+              {display.nextFlight.ScheduledDepartureTime
+                ? new Date(display.nextFlight.ScheduledDepartureTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
                 : ''}
             </span>
-            
           </div>
         )}
       </div>
@@ -529,6 +514,272 @@ If you see two stairs on the aircraft: passengers in the rear half of the plane 
         @keyframes fidsPulse { 0%,100%{opacity:1} 50%{opacity:.55} }
         @keyframes spin { to { transform: rotate(360deg); } }
         html,body,#__next { width:100vw; height:100vh; overflow:hidden; background:#070d1a; }
+
+        /* ═══════════════════════════════════════════════════════
+           TABLET (≤ 1024px)
+           ═══════════════════════════════════════════════════════ */
+        @media (max-width: 1024px) {
+          .fids-topbar { padding: 0.6rem 1.5rem !important; }
+          .fids-topbar-left { gap: 0.5rem !important; }
+          .fids-main { padding: 1rem 1.5rem !important; }
+          .fids-left-col { padding-right: 1.5rem !important; }
+          .fids-v-divider { margin: 0 1.5rem !important; }
+          .fids-footer { padding: 0.7rem 1.5rem !important; }
+          .fids-next-dest { max-width: 200px !important; }
+        }
+
+        /* ═══════════════════════════════════════════════════════
+           MOBILE LANDSCAPE & SMALL TABLET (≤ 768px)
+           ═══════════════════════════════════════════════════════ */
+        @media (max-width: 768px) {
+          html, body, #__next {
+            overflow: auto !important;
+            height: auto !important;
+            min-height: 100vh !important;
+          }
+
+          .fids-root {
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            height: auto !important;
+            min-height: 100vh !important;
+          }
+
+          .fids-topbar {
+            padding: 0.5rem 1rem !important;
+            flex-wrap: wrap !important;
+            gap: 0.2rem !important;
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 10 !important;
+          }
+
+          .fids-topbar-left {
+            gap: 0.4rem !important;
+            flex-wrap: wrap !important;
+          }
+
+          .fids-clock {
+            font-size: 1.4rem !important;
+          }
+
+          .fids-main {
+            flex-direction: column !important;
+            padding: 0.8rem 1rem !important;
+            gap: 1rem !important;
+          }
+
+          .fids-left-col {
+            flex: none !important;
+            width: 100% !important;
+            padding-right: 0 !important;
+            gap: 0.5rem !important;
+          }
+
+          .fids-logo-card {
+            height: 70px !important;
+            border-radius: 8px !important;
+          }
+
+          .fids-flight-number {
+            font-size: 3rem !important;
+          }
+
+          .fids-codeshare {
+            font-size: 0.8rem !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
+          }
+
+          .fids-dest-code {
+            font-size: 2rem !important;
+          }
+
+          .fids-dest-city {
+            font-size: 2.8rem !important;
+          }
+
+          .fids-charger-warning {
+            flex-direction: column !important;
+            gap: 0.25rem !important;
+            padding: 0.5rem 0.7rem !important;
+          }
+
+          .fids-charger-warning .fids-charger-icon,
+          .fids-boarding-notice .fids-boarding-icon {
+            display: none !important;
+          }
+
+          .fids-boarding-notice {
+            flex-direction: column !important;
+            gap: 0.25rem !important;
+            padding: 0.5rem 0.7rem !important;
+          }
+
+          .fids-v-divider {
+            width: 100% !important;
+            height: 1px !important;
+            margin: 0 !important;
+            background: linear-gradient(90deg, transparent 0%, #1e3a5f 20%, #1e3a5f 80%, transparent 100%) !important;
+          }
+
+          .fids-right-col {
+            width: 100% !important;
+            gap: 0.7rem !important;
+          }
+
+          .fids-time-value {
+            font-size: 2.8rem !important;
+          }
+
+          .fids-countdown {
+            flex-direction: column !important;
+            gap: 0.15rem !important;
+          }
+
+          .fids-status-badge {
+            font-size: 1.4rem !important;
+            padding: 0.35em 0.8em !important;
+          }
+
+          .fids-gate-changed-banner {
+            font-size: 0.9rem !important;
+            padding: 0.4rem 0.8rem !important;
+          }
+
+          .fids-checkin-banner {
+            font-size: 0.85rem !important;
+            padding: 0.35rem 0.8rem !important;
+          }
+
+          .fids-dgr-wrapper {
+            justify-content: center !important;
+            padding: 0.5rem 0 !important;
+            flex: none !important;
+          }
+
+          .fids-dgr-wrapper img {
+            max-height: 100px !important;
+          }
+
+          .fids-footer {
+            flex-direction: column !important;
+            padding: 0.6rem 1rem !important;
+            gap: 0.4rem !important;
+            align-items: flex-start !important;
+          }
+
+          .fids-footer-meta {
+            font-size: 0.7rem !important;
+          }
+
+          .fids-next-flight {
+            flex-wrap: wrap !important;
+            gap: 0.3rem 0.8rem !important;
+          }
+
+          .fids-next-fn {
+            font-size: 1.6rem !important;
+          }
+
+          .fids-next-dest {
+            font-size: 1.4rem !important;
+            max-width: 100% !important;
+            white-space: normal !important;
+            order: 10 !important;
+            width: 100% !important;
+          }
+
+          .fids-next-time {
+            font-size: 1.6rem !important;
+          }
+        }
+
+        /* ═══════════════════════════════════════════════════════
+           SMALL MOBILE (≤ 480px)
+           ═══════════════════════════════════════════════════════ */
+        @media (max-width: 480px) {
+          .fids-topbar {
+            padding: 0.4rem 0.6rem !important;
+          }
+
+          .fids-main {
+            padding: 0.6rem !important;
+            gap: 0.7rem !important;
+          }
+
+          .fids-logo-card {
+            height: 55px !important;
+            border-radius: 6px !important;
+          }
+
+          .fids-flight-number {
+            font-size: 2.4rem !important;
+          }
+
+          .fids-dest-code {
+            font-size: 1.6rem !important;
+          }
+
+          .fids-dest-city {
+            font-size: 2rem !important;
+          }
+
+          .fids-charger-warning,
+          .fids-boarding-notice {
+            padding: 0.4rem 0.5rem !important;
+            border-radius: 6px !important;
+          }
+
+          .fids-time-value {
+            font-size: 2.2rem !important;
+          }
+
+          .fids-status-badge {
+            font-size: 1.2rem !important;
+            padding: 0.3em 0.6em !important;
+          }
+
+          .fids-dgr-wrapper img {
+            max-height: 70px !important;
+          }
+
+          .fids-footer {
+            padding: 0.5rem 0.6rem !important;
+          }
+
+          .fids-next-fn,
+          .fids-next-time {
+            font-size: 1.3rem !important;
+          }
+
+          .fids-next-dest {
+            font-size: 1.1rem !important;
+          }
+
+          .fids-gate-changed-banner,
+          .fids-checkin-banner {
+            font-size: 0.8rem !important;
+            padding: 0.3rem 0.6rem !important;
+          }
+        }
+
+        /* ═══════════════════════════════════════════════════════
+           MOBILE PORTRAIT TALL SCREENS (≥ 768px width, ≤ 600px height)
+           ═══════════════════════════════════════════════════════ */
+        @media (max-height: 600px) and (min-width: 769px) {
+          .fids-main { padding: 0.6rem 1.5rem !important; gap: 0.5rem !important; }
+          .fids-left-col { gap: 0.4rem !important; }
+          .fids-right-col { gap: 0.5rem !important; }
+          .fids-logo-card { height: 60px !important; }
+          .fids-dest-city { font-size: 3.5rem !important; }
+          .fids-time-value { font-size: 2.8rem !important; }
+          .fids-status-badge { font-size: 1.4rem !important; padding: 0.3em 0.7em !important; }
+          .fids-dgr-wrapper img { max-height: 60px !important; }
+          .fids-footer { padding: 0.4rem 1.5rem !important; }
+          .fids-next-fn, .fids-next-dest, .fids-next-time { font-size: 1.6rem !important; }
+        }
       `}</style>
     </div>
   );
@@ -568,6 +819,11 @@ const styles: Record<string, React.CSSProperties> = {
   chargerWarning: { display: 'flex', alignItems: 'flex-start', gap: '.7rem', background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.35)', borderRadius: '10px', padding: '.7rem 1rem' },
   chargerIcon: { fontSize: '1.3rem', color: '#eab308', flexShrink: 0, lineHeight: '1.3' as unknown as number },
   chargerText: { fontSize: 'clamp(0.85rem, 1.4vw, 1.25rem)', fontWeight: 600, color: '#fde047', letterSpacing: '.04em', lineHeight: '1.4' as unknown as number, fontFamily: FONT_DISPLAY },
+
+  // ── BOARDING NOTICE ─────────────────────────────────────────
+  boardingNotice: { display: 'flex', alignItems: 'flex-start', gap: '.7rem', background: 'rgba(30,144,255,0.1)', border: '1px solid rgba(30,144,255,0.3)', borderRadius: '10px', padding: '.7rem 1rem' },
+  boardingIcon: { fontSize: '1.3rem', flexShrink: 0, lineHeight: '1.3' as unknown as number },
+  boardingText: { fontSize: 'clamp(0.85rem, 1.4vw, 1.25rem)', fontWeight: 600, color: C.text, letterSpacing: '.04em', lineHeight: '1.4' as unknown as number, fontFamily: FONT_DISPLAY },
 
   vDivider: { width: '1px', alignSelf: 'stretch', flexShrink: 0, background: `linear-gradient(180deg, transparent 0%, ${C.border} 15%, ${C.border} 85%, transparent 100%)`, margin: '0 2.5rem' },
   rightCol: { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '1rem' },
